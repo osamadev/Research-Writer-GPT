@@ -26,8 +26,6 @@ python-dotenv==1.0.0
 scikit-image==0.22.0
 semanticscholar==0.7.0
 setuptools==68.2.2
-torchaudio==2.1.2+cu121
-torchvision==0.16.2+cu121
 wheel==0.42.0
 wikipedia==1.4.0
 win-inet-pton==1.1.0

@@ -4,7 +4,7 @@
 
 Explore the world of academia with ease 🎓! Our AI-powered research assistant 🤖 is here to help you discover and recommend scholarly papers 📚, provide insightful summaries 📄, and guide you through a sea of literature with style and efficiency 🌟.
 
-![Research Assistant GPT](./images/research-assistant-gpt-01.png)
+<img src="./images/research-assistant-gpt-01.png" alt="Research Assistant GPT" width="600"/>
 
 Whether you're a seasoned researcher or a curious learner, our tool is designed to empower your academic journey and unlock new horizons of knowledge. Dive into our vast collection of resources and let the AI do the heavy lifting for you. Here's what you can expect:
 

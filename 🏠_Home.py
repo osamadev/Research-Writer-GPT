@@ -18,7 +18,7 @@ def main():
         resources and let the AI do the heavy lifting for you. Here's what you can expect:
     """)
 
-    st.image(image='./images/research-assistant-gpt-01.png', width=500)
+    st.image(image='./images/research-assistant-gpt-01.png', width=600)
 
     # Key Features Section
     st.subheader("Key Features")

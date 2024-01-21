@@ -1,7 +1,7 @@
 import streamlit as st
 
 def main():
-    st.set_page_config(page_title="Research Assistant GPT", layout="wide")
+    st.set_page_config(page_title="Research Assistant GPT", layout="wide", page_icon="🏠")
 
     # Stylish Header
     st.title("🎓 Research Assistant GPT 🤖")
@@ -18,7 +18,7 @@ def main():
         resources and let the AI do the heavy lifting for you. Here's what you can expect:
     """)
 
-    st.image(image='./images/research-assistant-gpt-01.png')
+    st.image(image='./images/research-assistant-gpt-01.png', width=500)
 
     # Key Features Section
     st.subheader("Key Features")

@@ -130,7 +130,7 @@ def initialize_chatbot():
 
 # Streamlit UI
 def main():
-    st.set_page_config("Research Assistant GPT", layout="wide")
+    st.set_page_config("Research Assistant GPT", layout="wide", page_icon="🎓")
     st.title("🎓 Research Assistant GPT 🤖")
     st.caption("Explore the world of academia with ease 🎓! Our AI-powered research assistant 🤖 is here to help you discover and recommend scholarly papers 📚, provide insightful summaries 📄, and guide you through a sea of literature with style and efficiency 🌟.")
     # Initialize chatbot

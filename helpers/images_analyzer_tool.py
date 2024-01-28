@@ -27,7 +27,7 @@ class ClarifaiImageAnalyzerFromURL(BaseTool):
             text_prompt = "Describe and analyze this image or video."
 
         model = Model("https://clarifai.com/openai/chat-completion/models/openai-gpt-4-vision")
-        inference_params = {'temperature': 0.2, 'max_tokens': 1000}
+        inference_params = {'temperature': 0.2, 'max_tokens': 4000}
         clarifai_inputs = Inputs.get_multimodal_input(input_id="", image_url=image_url, raw_text=text_prompt)
         model_prediction = model.predict(inputs=[clarifai_inputs], inference_params=inference_params)
         return model_prediction.outputs[0].data.text.raw
@@ -47,7 +47,7 @@ class ClarifaiImageAnalyzerFromFile(BaseTool):
         file_bytes = kwargs.get('file_bytes')
         prompt = kwargs.get('prompt')
         # Prepare inference parameters
-        inference_params = {'temperature': 0.2, 'max_tokens': 100}
+        inference_params = {'temperature': 0.2, 'max_tokens': 4000}
 
         # Perform model prediction
         model = Model("https://clarifai.com/openai/chat-completion/models/openai-gpt-4-vision")

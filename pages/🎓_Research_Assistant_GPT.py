@@ -6,23 +6,29 @@ from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
 from langchain.document_loaders import TextLoader
 from langchain.llms import Clarifai as Clarifaillm
-from langchain.chains.conversation.memory import ConversationBufferWindowMemory
-from langchain.agents import initialize_agent
-from langchain_community.tools.semanticscholar.tool import SemanticScholarQueryRun
+from langchain.llms.openai import OpenAI
+from langchain.callbacks import FinalStreamingStdOutCallbackHandler
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory, ConversationBufferMemory
+from langchain.agents import initialize_agent, AgentType, load_tools
+from langchain_community.tools.semanticscholar.tool import SemanticScholarQueryRun, SemanticScholarAPIWrapper
 from langchain_community.tools.google_scholar import GoogleScholarQueryRun
+from langchain_community.utilities.arxiv import ArxivAPIWrapper
 from langchain_community.utilities.google_scholar import GoogleScholarAPIWrapper
 from helpers.images_analyzer_tool import ClarifaiImageAnalyzerFromURL, ClarifaiImageAnalyzerFromFile
 from audio_recorder_streamlit import audio_recorder
 from langchain.schema.messages import SystemMessage
-from openai import OpenAI
 from clarifai.client.model import Model
 from langchain_community.vectorstores import Clarifai as Clarifaivectorstore
 from langchain_community.llms import Clarifai as Clarifaillm
 from langchain_community.tools import PubmedQueryRun
 from helpers.academia_kb_tool import AcademiaKBTool
+from helpers.CustomStreamingStdOutCallbackHandler import CustomStreamingStdOutCallbackHandler
 from langchain_community.document_loaders import PyPDFLoader
 import tempfile
 from typing import List
+from langchain.tools import Tool
+import threading
+
 
 def transcribe(audio_file):
     client = OpenAI()
@@ -77,6 +83,21 @@ def pdf_to_text(file_streams) -> List[Document]:
 
     return docs
 
+# Function to handle the conversation logic
+def handle_conversation(user_input, chat_agent):
+    if user_input:
+        # Append user input to conversation history
+        conversation_history = st.session_state.get('conversation_history', [])
+        conversation_history.append(f"👤 You: {user_input}")
+        # Process the input through the chat agent
+        response = chat_agent()
+        if 'output' in response:
+            conversation_history.append(f"🤖 AI: {response['output']}")
+
+        # Update the conversation history in session state
+        st.session_state['conversation_history'] = conversation_history
+
+
 # Initialize the Langchain agent
 def initialize_chatbot():
     system_message = SystemMessage(
@@ -88,36 +109,48 @@ def initialize_chatbot():
           Format the final answer in a well structured and organized way. Use APA style wherever needed.
           """
       )
-    model_url = "https://clarifai.com/openai/chat-completion/models/openai-gpt-4-vision"
+    model_url = "https://clarifai.com/openai/chat-completion/models/gpt-4-turbo"
 
-    llm = Clarifaillm(model_url=model_url)
-    semantic_scholar_tool = SemanticScholarQueryRun(description="""Use this tool to answer questions about sentific papers and literatures, 
-                                     or to provide recommendations or summaries about the papers or research topics. 
-                                                    Use this tool first before using Google Scholar Search. 
-                                                    If you did not find satisfactory results here, use the other tools.""")
+    # llm = Clarifaillm(model_url=model_url)
+
+    llm = OpenAI(callbacks=[CustomStreamingStdOutCallbackHandler()] ,temperature=0 ,streaming=True)
     
-    google_scholar_tool = GoogleScholarQueryRun(api_wrapper=GoogleScholarAPIWrapper(), description="""Use this tool to help answering 
+    semantic_scholar_tool = SemanticScholarQueryRun(name="Semantic Scholar", 
+                                                    api_wrapper=SemanticScholarAPIWrapper(top_k_results = 10, load_max_docs = 10),
+                                                    description="""Use this tool to answer questions about sentific papers and literatures,
+                                     or to provide recommendations or summaries about the papers or research topics. """, )
+    
+    google_scholar_tool = Tool("Google Scholar", func=GoogleScholarAPIWrapper().run, description="""Use this tool to help answering 
                                                 reasrch questions and provide recommendations on the research papers and literatures.
                                                 If the researcher asked for links to the papers or literatures, use this search tool first.""")
 
     pubmed_research_tool = PubmedQueryRun()
+    
+    arxiv_tool = Tool("Arxiv Articles and Literatures", 
+                      ArxivAPIWrapper(top_k_results = 10,
+            ARXIV_MAX_QUERY_LENGTH = 300,
+            load_max_docs = 10,
+            load_all_available_meta = False,
+            doc_content_chars_max = 40000).run,
+                      description="Use this tool to get details about articles published in Arxiv"
+                      )
 
     image_analyzer_tool = ClarifaiImageAnalyzerFromURL()
 
     academia_kb_tool = AcademiaKBTool()
 
-    tools = [academia_kb_tool, semantic_scholar_tool, google_scholar_tool, pubmed_research_tool, image_analyzer_tool]
+    tools = [semantic_scholar_tool, arxiv_tool, pubmed_research_tool, image_analyzer_tool]
 
-    conversational_memory = ConversationBufferWindowMemory(
-        memory_key='chat_history', input_key='input', output_key='output', k=5, return_messages=True)
+    conversational_memory = ConversationBufferMemory(
+        memory_key='chat_history', input_key='input', output_key='output', return_messages=True)
 
     chat_agent = initialize_agent(
-        agent='chat-conversational-react-description',
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
         tools=tools,
         llm=llm,
-        verbose=True,
+        verbose=False,
         early_stopping_method='generate',
-        handle_parsing_errors=True,
+        handle_parsing_errors=False,
         memory=conversational_memory,
         system_message = system_message,
         max_iterations=3, 
@@ -125,15 +158,40 @@ def initialize_chatbot():
             "system_message": system_message
         }
     )
-
     return chat_agent
 
-# Streamlit UI
+def generate_speech(text):
+    try:
+        return text_to_speech(text)
+    except Exception as e:
+        st.error(f"Error in text-to-speech generation: {e}")
+        return None
+
+def process_user_input(user_input, chat_agent):
+    # Update conversation history with user query
+    conversation_history = st.session_state['conversation_history']
+    conversation_history.append({'type': 'text', 'content': f"👤 You: {user_input}"})
+    st.session_state['conversation_history'] = conversation_history
+
+    # Get response from llm
+    response = chat_agent(st.session_state['conversation_history'])
+    if 'output' in response:
+        new_response = f"🤖 AI: {response['output']}"
+        conversation_history.append({'type': 'text', 'content': new_response})
+        st.session_state['conversation_history'] = conversation_history
+
+        # Generate and store audio if enabled
+        if st.session_state['enable_audio_transcription']:
+            speech_audio = generate_speech(response['output'])
+            if speech_audio:
+                conversation_history.append({'type': 'audio', 'content': speech_audio})
+                st.session_state['conversation_history'] = conversation_history
+
 def main():
     st.set_page_config("Research Assistant GPT", layout="wide", page_icon="🎓")
     st.title("🎓 Research Assistant GPT 🤖")
     st.caption("Explore the world of academia with ease 🎓! Our AI-powered research assistant 🤖 is here to help you discover and recommend scholarly papers 📚, provide insightful summaries 📄, and guide you through a sea of literature with style and efficiency 🌟.")
-    # Initialize chatbot
+        # Initialize chatbot
     chat_agent = initialize_chatbot()
 
      # PDF file uploader
@@ -181,6 +239,104 @@ def main():
     audio_bytes = audio_recorder(text="Click the mic to start recording", icon_size="1x", pause_threshold=1.2)
 
     if user_input:
+        process_user_input(user_input, chat_agent)
+
+    if audio_bytes:
+        # Process the recorded audio
+        save_audio_file(audio_bytes=audio_bytes, file_extension="mp3")
+
+        # Find the newest audio file
+        def get_creation_time(file):
+            return os.path.getctime(os.path.join("./temp/", file))
+
+        audio_file_path = './temp/' + max(
+            [f for f in os.listdir("./temp/") if f.startswith("audio")],
+            key=get_creation_time
+        )
+
+        # Transcribe the audio file
+        transcript_text = transcribe_audio(audio_file_path)
+        st.session_state['conversation_history'].append(f"👤 You: {transcript_text}")
+
+        # Get response from chatbot
+        response = chat_agent(st.session_state['conversation_history'])
+
+        if 'output' in response:
+            new_response = f"🤖 AI: {response['output']}"
+            st.session_state['conversation_history'].append(new_response)
+
+            # Transcribe response to audio if enabled
+            if st.session_state['enable_audio_transcription']:
+                speech_audio = text_to_speech(response['output'])
+                st.audio(speech_audio, format='audio/mp3', start_time=0)
+
+        # Clear the recorded audio to allow new recording
+        audio_bytes = None
+
+
+
+    # Display conversation history in an expander
+    with st.expander("**Conversation History**", expanded=True):
+        for item in st.session_state['conversation_history']:
+            if item['type'] == 'text':
+                st.markdown(item['content'], unsafe_allow_html=True)
+            elif item['type'] == 'audio':
+                st.audio(item['content'], format='audio/mp3', start_time=0)
+
+
+# Streamlit UI
+def main2():
+    st.set_page_config("Research Assistant GPT", layout="wide", page_icon="🎓")
+    st.title("🎓 Research Assistant GPT 🤖")
+    st.caption("Explore the world of academia with ease 🎓! Our AI-powered research assistant 🤖 is here to help you discover and recommend scholarly papers 📚, provide insightful summaries 📄, and guide you through a sea of literature with style and efficiency 🌟.")
+    # Initialize chatbot
+    chat_agent = initialize_chatbot()
+
+     # PDF file uploader
+    uploaded_files = st.sidebar.file_uploader("Upload PDF files to chat with or to get insights from", accept_multiple_files=True, type=['pdf'])
+    if uploaded_files:
+        process_files_button = st.sidebar.button("Process Uploaded Files")
+        if process_files_button:
+            documents = [file.getvalue() for file in uploaded_files]
+            docs = pdf_to_text(documents)
+
+            Clarifaivectorstore.from_documents(
+                user_id=st.secrets["USER_ID"],
+                app_id=st.secrets["APP_ID"],
+                documents=docs,
+                number_of_docs=len(docs),
+                pat=os.getenv("CLARIFAI_PAT")
+            )
+            st.sidebar.success("Documents processed. You can now start asking questions about the uploaded documents.")
+            uploaded_files = None
+    
+    # Initialize session state for conversation history and audio transcription setting
+    if 'conversation_history' not in st.session_state:
+        st.session_state['conversation_history'] = []
+    if 'enable_audio_transcription' not in st.session_state:
+        st.session_state['enable_audio_transcription'] = False
+
+    # Option to enable/disable audio transcription
+    enable_audio_transcription = st.checkbox("Enable audio transcription of responses", value=st.session_state['enable_audio_transcription'])
+
+    # Update session state only when there is a change
+    if enable_audio_transcription != st.session_state['enable_audio_transcription']:
+        st.session_state['enable_audio_transcription'] = enable_audio_transcription
+
+    if 'uploaded_image' not in st.session_state:
+        st.session_state['uploaded_image'] = None
+    
+    # Chat interface
+    user_input = st.chat_input("Enter your research question here", key="chat_input2")
+    # Image Uploader
+    uploaded_image = st.file_uploader("Optionally, upload an image for analysis", type=["png", "jpg", "jpeg"])
+    if uploaded_image is not None:
+        st.session_state['uploaded_image'] = uploaded_image
+
+     # Record Audio
+    audio_bytes = audio_recorder(text="Click the mic to start recording", icon_size="1x", pause_threshold=1.2)
+
+    if user_input:
         # Update conversation history with user query
         st.session_state['conversation_history'].append(f"👤 You: {user_input}")
 
@@ -188,9 +344,9 @@ def main():
             clarifai_analyzer = ClarifaiImageAnalyzerFromFile()
             tool_input = {
                 "file_bytes": st.session_state['uploaded_image'].getvalue(),
-                "prompt": user_input
+                "prompt": st.session_state['conversation_history']
             }
-            response = clarifai_analyzer.run(tool_input)
+            response = clarifai_analyzer.run(tool_input, callbacks=[CustomStreamingStdOutCallbackHandler()])
             if response:
                 new_response = f"🤖 AI: {response}"
                 st.session_state['conversation_history'].append(new_response)
@@ -201,7 +357,7 @@ def main():
                     st.audio(speech_audio, format='audio/mp3', start_time=0)
         else:
             # Get response from llm
-            response = chat_agent(user_input)
+            response = chat_agent(st.session_state['conversation_history'])
             if 'output' in response:
                 new_response = f"🤖 AI: {response['output']}"
                 st.session_state['conversation_history'].append(new_response)
@@ -234,7 +390,7 @@ def main():
         st.session_state['conversation_history'].append(f"👤 You: {transcript_text}")
 
         # Get response from chatbot
-        response = chat_agent(transcript_text)
+        response = chat_agent(st.session_state['conversation_history'])
 
         if 'output' in response:
             new_response = f"🤖 AI: {response['output']}"

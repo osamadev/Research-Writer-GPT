@@ -8,7 +8,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.vectorstores import Chroma
 from langchain.memory import ConversationBufferWindowMemory, ConversationBufferMemory
 
-import chromadb
+# import chromadb
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from streamlit import session_state
@@ -20,49 +20,49 @@ from langchain_community.vectorstores import Pinecone
 pdf_folder_path = "data"
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-def process_pdf_documents(pdf_folder_path: str):
-    documents = []
+# def process_pdf_documents(pdf_folder_path: str):
+#     documents = []
 
-    for file in os.listdir(pdf_folder_path):
-        if file.endswith('.pdf'):
-            pdf_path = os.path.join(pdf_folder_path, file)
-            loader = PyPDFLoader(pdf_path)
-            documents.extend(loader.load())
+#     for file in os.listdir(pdf_folder_path):
+#         if file.endswith('.pdf'):
+#             pdf_path = os.path.join(pdf_folder_path, file)
+#             loader = PyPDFLoader(pdf_path)
+#             documents.extend(loader.load())
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000, 
-        chunk_overlap=100, 
-        length_function=len, 
-        is_separator_regex=False,
-        separators=["\n\n", "\n", " ", ""]
-    )
-    chunked_documents = text_splitter.split_documents(documents)
+#     text_splitter = RecursiveCharacterTextSplitter(
+#         chunk_size=1000, 
+#         chunk_overlap=100, 
+#         length_function=len, 
+#         is_separator_regex=False,
+#         separators=["\n\n", "\n", " ", ""]
+#     )
+#     chunked_documents = text_splitter.split_documents(documents)
 
-    return chunked_documents
+#     return chunked_documents
 
 
-def load_or_persist_chromadb(collection_name: str, persist_directory: str) -> Chroma:
-    client = chromadb.Client()
+# def load_or_persist_chromadb(collection_name: str, persist_directory: str) -> Chroma:
+#     client = chromadb.Client()
 
-    existing_collections = client.list_collections()
-    if existing_collections.count <= 0:
-        print("Creating new collection and persisting documents.")
-        client.create_collection(collection_name)
-        chunked_documents = process_pdf_documents(pdf_folder_path)
+#     existing_collections = client.list_collections()
+#     if existing_collections.count <= 0:
+#         print("Creating new collection and persisting documents.")
+#         client.create_collection(collection_name)
+#         chunked_documents = process_pdf_documents(pdf_folder_path)
         
-        # Generate and persist the embeddings
-        vectordb = Chroma.from_documents(
-            documents=chunked_documents,
-            embedding=OpenAIEmbeddings(),
-            persist_directory=persist_directory, 
-        )
-        vectordb.persist()
-    else:
-        print("Collection already exists. Loading from ChromaDB.")
-        vectordb = Chroma(persist_directory=persist_directory, 
-                  embedding_function=OpenAIEmbeddings())
+#         # Generate and persist the embeddings
+#         vectordb = Chroma.from_documents(
+#             documents=chunked_documents,
+#             embedding=OpenAIEmbeddings(),
+#             persist_directory=persist_directory, 
+#         )
+#         vectordb.persist()
+#     else:
+#         print("Collection already exists. Loading from ChromaDB.")
+#         vectordb = Chroma(persist_directory=persist_directory, 
+#                   embedding_function=OpenAIEmbeddings())
 
-    return vectordb
+#     return vectordb
 
 def initialize_pinecone():
     index_name = "research-assistant" 
@@ -218,22 +218,22 @@ def get_llm_response(query):
 #         index.upsert(vectors=zip(ids, embeds, metadatas))
 #         st.success("Documents re-embedded and Chroma index updated.")
 
-def embed_documents():
-    client = chromadb.Client()
-    collection_name = "research_papers"
-    persist_directory = "vector_db"
+# def embed_documents():
+#     client = chromadb.Client()
+#     collection_name = "research_papers"
+#     persist_directory = "vector_db"
 
-    # Re-checking for new files and re-embedding
-    client.get_or_create_collection(collection_name)
+#     # Re-checking for new files and re-embedding
+#     client.get_or_create_collection(collection_name)
 
-    chunked_documents = process_pdf_documents(pdf_folder_path)
-    vectordb = Chroma.from_documents(
-        documents=chunked_documents,
-        embedding=OpenAIEmbeddings(),
-        persist_directory=persist_directory
-    )
-    vectordb.persist()
-    st.success("Documents re-embedded and Chroma index updated.")
+#     chunked_documents = process_pdf_documents(pdf_folder_path)
+#     vectordb = Chroma.from_documents(
+#         documents=chunked_documents,
+#         embedding=OpenAIEmbeddings(),
+#         persist_directory=persist_directory
+#     )
+#     vectordb.persist()
+#     st.success("Documents re-embedded and Chroma index updated.")
 
 ## Parse results and cite sources
 def process_llm_response(llm_response):
@@ -292,7 +292,8 @@ st.header("🎓 Research Assistant RAG 🔎")
 
 # Sidebar button for embedding documents
 if st.sidebar.button("Embed Documents"):
-    embed_documents()
+    # embed_documents()
+    pass
 
 # Sidebar for managing PDFs
 with st.sidebar.expander("Upload Research Papers"):

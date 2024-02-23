@@ -57,11 +57,6 @@ def init_app():
     os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
     os.environ["PINECONE_ENV"] = st.secrets["PINECONE_ENV"]
 
-    project_id = "vital-future-408219"
-    location = "us-central1"
-    credentials = service_account.Credentials.from_service_account_info(st.secrets.connections_gcs)
-    vertexai.init(project=project_id, location=location, credentials=credentials)
-
 st.title("Evaluations")
 
 st.runtime.legacy_caching.clear_cache()

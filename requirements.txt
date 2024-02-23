@@ -110,7 +110,8 @@ scikit-image==0.22.0
 scipy==1.11.4
 semantic-version==2.10.0
 semanticscholar==0.7.0
-chromadb==0.3.29
+chroma-hnswlib==0.7.3
+chromadb==0.4.22
 XlsxWriter==3.2.0
 xmltodict==0.13.0
 xxhash==3.4.1

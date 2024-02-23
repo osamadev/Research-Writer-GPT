@@ -30,6 +30,8 @@ import os
 import random
 from utils.feedback_functions import load_feedback_functions
 from langchain.prompts import PromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain.schema import StrOutputParser
 
 st.set_page_config(page_title="Leaderboard", layout="wide")
 
@@ -69,7 +71,7 @@ class ResearchWriterApp:
 
 def streamlit_app():
     tru = Tru(database_url=database_url)
-    tru.reset_database()
+    # tru.reset_database()
 
     lms = tru.db
     # Set the title and subtitle of the app
@@ -92,7 +94,7 @@ def streamlit_app():
             filePath = './eval_questions.txt'
             eval_completions_from_questions(filePath)
             st.sidebar.success("Feedback functions have been executed successfully!")
-            #st.rerun()
+            st.rerun()
 
     if df.empty:
         st.write("No records yet...")
@@ -198,18 +200,22 @@ def create_coversational_chain():
     openai_api_key = st.secrets["OPENAI_API_KEY"]
 
     embed = OpenAIEmbeddings(model=model_name, openai_api_key=openai_api_key)
-    vectorstore = Pinecone(index, embed, "page_content")
 
     openai_model = "gpt-4-0125-preview"
 
+    text_field = "text"
+
+    vectorstore = Pinecone(
+        index, embed.embed_query, text_field
+    )
+
     retriever = vectorstore.as_retriever()
     from langchain import hub
-    
     prompt = hub.pull("rlm/rag-prompt")
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+    llm = ChatOpenAI(model_name=openai_model, temperature=0.1)
 
-    from langchain_core.runnables import RunnablePassthrough
-    from langchain.schema import StrOutputParser
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
 
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
@@ -288,12 +294,9 @@ def eval_completions_from_questions(filePath: str):
     with open(filePath, 'r') as file:
         questions = file.readlines()
 
-    from trulens_eval.tru_virtual import TruVirtual
-
-    for question in questions[:2]:
+    for question in questions[:15]:
         with tru_recorder as recording:
-            result = app.invoke(question)
-            st.write(result)
+            app.invoke(question)
 
 def eval_gpt4_completions(user_questions):
     tru = Tru()

@@ -215,61 +215,90 @@ def create_agent_chain():
 
 
 def get_llm_response(query):
-    chain = create_coversational_chain()
+    chain = create_agent_chain()
     response = chain.invoke(query)
     return response
 
 ## Parse results and cite sources
 def process_llm_response(llm_response):
-    search_results = llm_response
-    # sources = {}
+    search_results = llm_response["answer"]
+    sources = {}
 
-    # for source in llm_response["source_documents"]:
-    #     doc_name = source.metadata['source'].replace('data\\', '')
-    #     page_num = source.metadata['page']
-    #     if doc_name not in sources:
-    #         sources[doc_name] = {page_num}
-    #     else:
-    #         sources[doc_name].add(page_num)
+    for source in llm_response["source_documents"]:
+        metadata = source.metadata  # Assuming metadata is directly accessible
 
-    # # Format the sources
-    # formatted_sources = [f"{doc} (Pages {' ,'.join(map(str, pages))})" for doc, pages in sources.items()]
-    return search_results
+        doc_name = metadata.get('file_name') or metadata.get('source')
+        if doc_name:
+            doc_name = doc_name.replace('./users_data/', '').replace('data\\', '')
+        else:
+            doc_name = "Unknown Document"
+
+        page_num = metadata.get('page')
+        
+        # Ensure page_num is a string and not None before adding
+        if page_num is not None:
+            page_num_str = str(page_num)
+        else:
+            page_num_str = "Unknown"
+
+        if doc_name not in sources:
+            sources[doc_name] = {page_num_str}
+        else:
+            sources[doc_name].add(page_num_str)
+
+    sources = {doc: pages for doc, pages in sources.items() if doc != "Unknown Document"}
+
+    for doc, pages in sources.items():
+        # Only add "(Pages )" if there are page numbers
+        if pages:  # This checks if the pages list is not empty
+            # Ensure all page numbers are valid integers or skip them
+            valid_pages = [page for page in pages if page.isdigit()]
+            if valid_pages:  # Check again if there are any valid pages left
+                formatted_sources.append(f"{doc} (Pages {' ,'.join(sorted(valid_pages, key=lambda x: int(x)))})")
+            else:
+                formatted_sources.append(doc)  # Add the document without "(Pages )"
+        else:
+            formatted_sources.append(doc)  # Add the document without "(Pages )"
+
+    # Only include pages with valid numeric values for sorting
+    formatted_sources = [
+        f"{doc} (Pages {' ,'.join(sorted((page for page in pages if page.isdigit()), key=lambda x: int(x)))})"
+        for doc, pages in sources.items()
+    ]
+    return search_results, formatted_sources
+
+
 
 # Function to format sources as a bulleted list in Markdown
 def format_sources_as_markdown(sources):
     formatted_sources = "\n".join([f"- {source}" for source in sources])
     return formatted_sources
 
-# Function to list and delete PDF files
-def list_and_manage_pdfs(pdf_folder_path):
-    pdf_files = [f for f in os.listdir(pdf_folder_path) if f.endswith('.pdf')]
-    selected_pdf = st.sidebar.selectbox("Select a PDF to delete", pdf_files)
-    if st.sidebar.button(f"Delete '{selected_pdf}'"):
-        os.remove(os.path.join(pdf_folder_path, selected_pdf))
-        st.sidebar.success(f"Deleted {selected_pdf}")
-        # Refresh the session state to update the file list
-        session_state.update_file_list = True
+def display_search_results_with_citations(search_results, formatted_sources):
+    # Display the search results (the answer to the query)
+    if search_results:
+        st.markdown("### Search Results")
+        st.markdown(search_results)  
+    else:
+        st.markdown("No results found.")
+    
+    if formatted_sources:
+        # Display citations and references in a collapsed panel
+        with st.expander("Citations and References", expanded=False):
+            st.markdown("### Sources")
+            # Use the provided function to format sources as markdown
+            formatted_sources_md = format_sources_as_markdown(formatted_sources)
+            st.markdown(formatted_sources_md)
 
 # Function to upload new PDFs
 def upload_pdf(pdf_folder_path):
     uploaded_files = st.sidebar.file_uploader("Upload Research Papers", type="pdf", accept_multiple_files=True)
-    for uploaded_file in uploaded_files:
-        if uploaded_file is not None:
-            with open(os.path.join(pdf_folder_path, uploaded_file.name), "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.sidebar.success(f"Uploaded {uploaded_file.name}")
-            # Refresh the session state to update the file list
-            session_state.update_file_list = True
-
-
-# Function to format and display search results elegantly
-def display_search_results(results):
-    if results:
-        st.markdown("### Search Results")
-        st.markdown(results)  
-    else:
-        st.markdown("No results found.")
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            if uploaded_file is not None:
+                with open(os.path.join(pdf_folder_path, uploaded_file.name), "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+        st.sidebar.success(f"Documents uploaded successfully.")
 
 # Initialize session state for conversation history if it does not exist
 if 'conversation_history' not in st.session_state:
@@ -278,13 +307,15 @@ if 'conversation_history' not in st.session_state:
 
 def handle_submit(query):
     results = get_llm_response(query)
+    results, sources = process_llm_response(results)
+    display_search_results_with_citations(results, sources)
     # Append results to the conversation history
     st.session_state.conversation_history.append((query, results))
-    display_search_results(results)
 
 def setup_ui():
     st.set_page_config(page_title="Research Assistant RAG", page_icon="🎓", layout="wide")
     st.title("🎓 Research Assistant RAG 🔎")
+    st.caption("Discover the future of research with Research Assistant RAG 📚🔍 – your AI-powered guide to navigating and conversing with a vast ocean of Arxiv papers and your own scientific documents, unlocking insights and answers with ease! 🚀🤖")
 
     # Upload and Manage PDFs in Sidebar
     with st.sidebar:

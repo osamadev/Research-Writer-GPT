@@ -17,52 +17,102 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain.schema import StrOutputParser
 from langchain_community.vectorstores import Pinecone
 
-pdf_folder_path = "data"
+pdf_folder_path = "users_data"
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# def process_pdf_documents(pdf_folder_path: str):
-#     documents = []
+import os
+import pandas as pd
+from uuid import uuid4
+from tqdm.auto import tqdm
 
-#     for file in os.listdir(pdf_folder_path):
-#         if file.endswith('.pdf'):
-#             pdf_path = os.path.join(pdf_folder_path, file)
-#             loader = PyPDFLoader(pdf_path)
-#             documents.extend(loader.load())
+def process_pdf_documents(pdf_folder_path: str):
+    records = []
+    for file in os.listdir(pdf_folder_path):
+        if file.endswith('.pdf'):
+            pdf_path = os.path.join(pdf_folder_path, file)
+            loader = PyPDFLoader(pdf_path)
+            loaded_docs = loader.load()
 
-#     text_splitter = RecursiveCharacterTextSplitter(
-#         chunk_size=1000, 
-#         chunk_overlap=100, 
-#         length_function=len, 
-#         is_separator_regex=False,
-#         separators=["\n\n", "\n", " ", ""]
-#     )
-#     chunked_documents = text_splitter.split_documents(documents)
+            for doc in loaded_docs:
+                records.append({
+                    'title': os.path.splitext(file)[0],  # File name without extension as title
+                    'context': doc,  # Storing the document content in 'context',
+                    'file_name': file
+                })
 
-#     return chunked_documents
+    return pd.DataFrame(records)
 
+def split_and_embed_documents(dataframe, embed, index):
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000, 
+        chunk_overlap=100, 
+        length_function=len, 
+        is_separator_regex=False,
+        separators=["\n\n", "\n", " ", ""]
+    )
+    
+    batch_size = 100
+    for i in tqdm(range(0, len(dataframe), batch_size)):
+        batch_df = dataframe.iloc[i:i + batch_size]
 
-# def load_or_persist_chromadb(collection_name: str, persist_directory: str) -> Chroma:
-#     client = chromadb.Client()
-
-#     existing_collections = client.list_collections()
-#     if existing_collections.count <= 0:
-#         print("Creating new collection and persisting documents.")
-#         client.create_collection(collection_name)
-#         chunked_documents = process_pdf_documents(pdf_folder_path)
+        # first get metadata fields for this record
+        metadatas = [{
+            'title': record['title'],
+            'text': str(record['context']),
+            'file_name': record['file_name']
+            } for _, record in batch_df.iterrows()]
         
-#         # Generate and persist the embeddings
-#         vectordb = Chroma.from_documents(
-#             documents=chunked_documents,
-#             embedding=OpenAIEmbeddings(),
-#             persist_directory=persist_directory, 
-#         )
-#         vectordb.persist()
-#     else:
-#         print("Collection already exists. Loading from ChromaDB.")
-#         vectordb = Chroma(persist_directory=persist_directory, 
-#                   embedding_function=OpenAIEmbeddings())
+        # Splitting the documents into chunks
+        batch_df['context_chunks'] = batch_df['context'].apply(lambda x: text_splitter.split_documents([x]))
 
-#     return vectordb
+        # Flatten the context for embedding
+        flattened_contexts = batch_df.explode('context_chunks')['context_chunks'].tolist()
+
+        # Ensure each element in flattened_contexts is a string
+        flattened_contexts = [str(context) for context in flattened_contexts if context]
+
+        # Check if embed_documents expects a list or single strings
+        try:
+            # If it expects a list
+            embeds = embed.embed_documents(flattened_contexts)
+        except TypeError:
+            # If it expects individual strings
+            embeds = [embed.embed_documents(context) for context in flattened_contexts]
+
+        # Create IDs for each chunk
+        ids = [str(uuid4()) for _ in range(len(embeds))]
+
+        # Upsert to Pinecone
+        index.upsert(vectors=zip(ids, embeds, metadatas))
+
+def embed_documents():
+    pdf_folder_path = './users_data/'
+    pdf_files = [f for f in os.listdir(pdf_folder_path) if f.endswith('.pdf')]
+
+    # Check if there are PDF files in the folder
+    if not pdf_files:
+        st.error("No PDF files found in the folder. Please upload documents to proceed.")
+        return
+
+    index = initialize_pinecone()
+    data = process_pdf_documents(pdf_folder_path)
+
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    model_name = 'text-embedding-ada-002'
+
+    embed = OpenAIEmbeddings(
+        model=model_name,
+        openai_api_key=OPENAI_API_KEY
+    )
+    
+    split_and_embed_documents(data, embed, index)
+
+    # After embedding, delete the PDF files
+    for filename in pdf_files:
+        os.remove(os.path.join(pdf_folder_path, filename))
+    
+    # Display a success message
+    st.success("Document embedding and cleanup completed successfully.")
 
 def initialize_pinecone():
     index_name = "research-assistant" 
@@ -168,73 +218,6 @@ def get_llm_response(query):
     response = chain.invoke(query)
     return response
 
-# def embed_documents():
-#     from langchain_community.document_loaders import PyPDFLoader
-
-#     loader = PyPDFLoader('./dataset', glob="**/*.pdf")
-#     data = loader.load()
-
-#     from langchain.text_splitter import RecursiveCharacterTextSplitter
-#     import tqdm
-
-#     text_splitter = RecursiveCharacterTextSplitter(
-#         chunk_size=1000, 
-#             chunk_overlap=100, 
-#             length_function=len, 
-#             is_separator_regex=False,
-#             separators=["\n\n", "\n", " ", ""]
-#     )
-#     docs_chunks = text_splitter.split_documents(data)
-
-#     batch_size = 100
-#     OPENAI_API_KEY =os.environ["OPENAI_API_KEY"]
-#     model_name = 'text-embedding-ada-002'
-
-#     embed = OpenAIEmbeddings(
-#         model=model_name,
-#         openai_api_key=OPENAI_API_KEY
-#     )
-#     texts = []
-#     metadatas = []
-
-#     for i in tqdm(range(0, len(docs_chunks), batch_size)):
-#         # get end of batch
-#         i_end = min(len(docs_chunks), i+batch_size)
-#         batch = docs_chunks[i:i_end]
-
-#         # first get metadata fields for this record
-#         metadatas = [{
-#             'text': record.page_content
-#         } for _, record in enumerate(batch)]
-#         # get the list of contexts / documents
-#         documents = batch
-#         # create document embeddings
-
-#         embeds = embed.embed_documents([str(doc.page_content) for doc in documents])
-#         # get IDs
-#         # Create IDs for each chunk
-#         ids = [uuid4().hex for _ in range(len(embeds))]
-#         # add everything to pinecone
-#         index.upsert(vectors=zip(ids, embeds, metadatas))
-#         st.success("Documents re-embedded and Chroma index updated.")
-
-# def embed_documents():
-#     client = chromadb.Client()
-#     collection_name = "research_papers"
-#     persist_directory = "vector_db"
-
-#     # Re-checking for new files and re-embedding
-#     client.get_or_create_collection(collection_name)
-
-#     chunked_documents = process_pdf_documents(pdf_folder_path)
-#     vectordb = Chroma.from_documents(
-#         documents=chunked_documents,
-#         embedding=OpenAIEmbeddings(),
-#         persist_directory=persist_directory
-#     )
-#     vectordb.persist()
-#     st.success("Documents re-embedded and Chroma index updated.")
-
 ## Parse results and cite sources
 def process_llm_response(llm_response):
     search_results = llm_response
@@ -269,57 +252,66 @@ def list_and_manage_pdfs(pdf_folder_path):
 
 # Function to upload new PDFs
 def upload_pdf(pdf_folder_path):
-    uploaded_file = st.sidebar.file_uploader("Upload a research paper", type="pdf")
-    if uploaded_file is not None:
-        with open(os.path.join(pdf_folder_path, uploaded_file.name), "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        st.sidebar.success(f"Uploaded {uploaded_file.name}")
-        # Refresh the session state to update the file list
-        session_state.update_file_list = True
+    uploaded_files = st.sidebar.file_uploader("Upload Research Papers", type="pdf", accept_multiple_files=True)
+    for uploaded_file in uploaded_files:
+        if uploaded_file is not None:
+            with open(os.path.join(pdf_folder_path, uploaded_file.name), "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.sidebar.success(f"Uploaded {uploaded_file.name}")
+            # Refresh the session state to update the file list
+            session_state.update_file_list = True
 
 
 # Function to format and display search results elegantly
 def display_search_results(results):
     if results:
         st.markdown("### Search Results")
-        st.markdown(results)  # Assuming 'results' is a Markdown-compatible string
+        st.markdown(results)  
     else:
         st.markdown("No results found.")
 
-# Streamlit App
-st.set_page_config(page_title="Research Assistant RAG", page_icon="🎓", layout="wide")
-st.header("🎓 Research Assistant RAG 🔎")
+# Initialize session state for conversation history if it does not exist
+if 'conversation_history' not in st.session_state:
+    st.session_state.conversation_history = []
 
-# Sidebar button for embedding documents
-if st.sidebar.button("Embed Documents"):
-    # embed_documents()
-    pass
 
-# Sidebar for managing PDFs
-with st.sidebar.expander("Upload Research Papers"):
-    #list_and_manage_pdfs(pdf_folder_path)
-    upload_pdf(pdf_folder_path)
-
-if 'update_file_list' not in session_state:
-    session_state.update_file_list = False
-
-if session_state.update_file_list:
-    # Refresh the page to update the file list
-    st.rerun()
-
-# Use a key for the text_input to reset the search when the text changes
-form_input = st.text_input('Enter your query', key="query")
-
-submit = st.button("Search")
-
-def handle_submit():
-    results = process_llm_response(get_llm_response(form_input))
+def handle_submit(query):
+    results = get_llm_response(query)
+    # Append results to the conversation history
+    st.session_state.conversation_history.append((query, results))
     display_search_results(results)
-    # formatted_sources = format_sources_as_markdown(sources)
-    # with st.expander("***Sources and Citation***"):
-    #     st.markdown(formatted_sources)
 
-if submit:
-    handle_submit()
+def setup_ui():
+    st.set_page_config(page_title="Research Assistant RAG", page_icon="🎓", layout="wide")
+    st.title("🎓 Research Assistant RAG 🔎")
+
+    # Upload and Manage PDFs in Sidebar
+    with st.sidebar:
+        st.header("Manage Research Papers")
+        upload_pdf(pdf_folder_path)
+        # Button to trigger document embedding process
+        if st.sidebar.button("Embed Documents"):
+            embed_documents()  # Assumes this function is properly defined above
+            st.sidebar.success("Documents embedded successfully.")
+
+    # Enhanced Search Box
+    with st.form("search_form"):
+        query = st.text_input("Enter your query", help="Type your research query here.")
+        submit = st.form_submit_button("Search")
+        if submit:
+            handle_submit(query)
+
+    # Display conversation history
+    with st.expander("Conversation History"):
+        for i, (q, a) in enumerate(st.session_state.conversation_history, start=1):
+            st.markdown(f"**Q{i}:** {q}")
+            st.markdown(f"**A{i}:** {a}")
+
+# Main App
+def main():
+    setup_ui()
+
+if __name__ == "__main__":
+    main()
 
 

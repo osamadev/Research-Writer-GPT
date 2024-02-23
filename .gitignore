@@ -3,3 +3,4 @@ Retrieval_QA_with_Conversation_memory.ipynb
 data/
 .streamlit/secrets.toml
 langchain_rag_truLens.ipynb
+users_data/

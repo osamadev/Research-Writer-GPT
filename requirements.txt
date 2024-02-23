@@ -29,12 +29,7 @@ certifi==2023.11.17
 cffi==1.16.0
 chardet==5.2.0
 charset-normalizer==3.3.2
-chroma-hnswlib==0.7.3
-chromadb==0.4.22
 datasets==2.16.0
-debugpy==1.8.0
-decorator==5.1.1
-Deprecated==1.2.14
 deta==1.2.0
 dill==0.3.7
 distro==1.8.0
@@ -110,3 +105,4 @@ streamlit-oauth==0.1.8
 transformers==4.36.2
 trulens-eval==0.23.0
 tqdm==4.66.1
+python-pptx==0.6.23

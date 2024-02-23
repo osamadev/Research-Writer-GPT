@@ -16,6 +16,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain.schema import StrOutputParser
 from langchain_community.vectorstores import Pinecone
+from streamlit_extras.switch_page_button import switch_page
 
 pdf_folder_path = "users_data"
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
@@ -112,7 +113,7 @@ def embed_documents():
         os.remove(os.path.join(pdf_folder_path, filename))
     
     # Display a success message
-    st.success("Document embedding and cleanup completed successfully.")
+    st.success("Document embeddings completed successfully.")
 
 def initialize_pinecone():
     index_name = "research-assistant" 
@@ -291,15 +292,17 @@ def setup_ui():
         upload_pdf(pdf_folder_path)
         # Button to trigger document embedding process
         if st.sidebar.button("Embed Documents"):
-            embed_documents()  # Assumes this function is properly defined above
-            st.sidebar.success("Documents embedded successfully.")
+            embed_documents()
 
-    # Enhanced Search Box
     with st.form("search_form"):
         query = st.text_input("Enter your query", help="Type your research query here.")
         submit = st.form_submit_button("Search")
-        if submit:
+
+    if submit:
+        if query:
             handle_submit(query)
+        else:
+            st.error("Please enter your question first.")
 
     # Display conversation history
     with st.expander("Conversation History"):
@@ -312,6 +315,12 @@ def main():
     setup_ui()
 
 if __name__ == "__main__":
-    main()
+    if ("authentication_status" not in st.session_state or
+            st.session_state["authentication_status"] is None or
+            st.session_state["authentication_status"] is False):
+        switch_page("Home")
+
+    if st.session_state["authentication_status"]:
+        main()
 
 

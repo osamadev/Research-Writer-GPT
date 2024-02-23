@@ -41,8 +41,6 @@ from trulens_eval.ux.components import write_or_json
 from trulens_eval.ux.styles import cellstyle_jscode
 from streamlit_extras.switch_page_button import switch_page
 import os
-from google.oauth2 import service_account
-import vertexai
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 st.set_page_config(page_title="Evaluations", layout="wide")

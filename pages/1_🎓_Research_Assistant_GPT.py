@@ -29,6 +29,7 @@ from langchain.prompts.chat import (
     )
 from langchain.prompts import PromptTemplate
 from helpers.presentation_generator import *
+from streamlit_extras.switch_page_button import switch_page
 
 def transcribe(audio_file):
     from openai import OpenAI
@@ -336,5 +337,11 @@ def transcribe_audio(file_path):
     return transcript
 
 if __name__ == "__main__":
+
+    if "authentication_status" not in st.session_state \
+        or st.session_state["authentication_status"] == None or st.session_state["authentication_status"] == False:
+        switch_page("Home")
+        
     init_app()
-    main()
+    if st.session_state["authentication_status"]:
+        main()

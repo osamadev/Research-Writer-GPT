@@ -248,6 +248,7 @@ def process_llm_response(llm_response):
 
     sources = {doc: pages for doc, pages in sources.items() if doc != "Unknown Document"}
 
+    formatted_sources = []
     for doc, pages in sources.items():
         # Only add "(Pages )" if there are page numbers
         if pages:  # This checks if the pages list is not empty
@@ -260,11 +261,6 @@ def process_llm_response(llm_response):
         else:
             formatted_sources.append(doc)  # Add the document without "(Pages )"
 
-    # Only include pages with valid numeric values for sorting
-    formatted_sources = [
-        f"{doc} (Pages {' ,'.join(sorted((page for page in pages if page.isdigit()), key=lambda x: int(x)))})"
-        for doc, pages in sources.items()
-    ]
     return search_results, formatted_sources
 
 
@@ -301,8 +297,8 @@ def upload_pdf(pdf_folder_path):
         st.sidebar.success(f"Documents uploaded successfully.")
 
 # Initialize session state for conversation history if it does not exist
-if 'conversation_history' not in st.session_state:
-    st.session_state.conversation_history = []
+if 'search_history' not in st.session_state:
+    st.session_state.search_history = []
 
 
 def handle_submit(query):
@@ -310,7 +306,7 @@ def handle_submit(query):
     results, sources = process_llm_response(results)
     display_search_results_with_citations(results, sources)
     # Append results to the conversation history
-    st.session_state.conversation_history.append((query, results))
+    st.session_state.search_history.append((query, results))
 
 def setup_ui():
     st.set_page_config(page_title="Research Assistant RAG", page_icon="🎓", layout="wide")
@@ -337,7 +333,7 @@ def setup_ui():
 
     # Display conversation history
     with st.expander("Conversation History"):
-        for i, (q, a) in enumerate(st.session_state.conversation_history, start=1):
+        for i, (q, a) in enumerate(st.session_state.search_history, start=1):
             st.markdown(f"**Q{i}:** {q}")
             st.markdown(f"**A{i}:** {a}")
 

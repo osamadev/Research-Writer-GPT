@@ -2,12 +2,12 @@ import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
 
 # Streamlit page configuration
-st.set_page_config(page_title="📊 Gemini LLM Evaluation with RAG Metrics using TruLens Evals 🌟", layout="wide")
+st.set_page_config(page_title="📊 GPT-4 LLM Evaluation with RAG Metrics using TruLens Evals 🌟", layout="wide")
 
 def display_content():
     st.markdown("""
-# 📊 Gemini LLM Evaluation using TruLens Evals based on RAG triad of metrics
-This document presents the evaluation results of the Gemini Language Model (LLM) using TruLens Evals based on the Retrieval Augmented Generation (RAG) triad of metrics. These metrics are crucial for assessing the relevancy of the model's answers to user prompts.
+# 📊 LLM Evaluation using TruLens Evals based on RAG triad of metrics
+This document presents the evaluation results of the GPT-4 Language Model (LLM) using TruLens Evals based on the Retrieval Augmented Generation (RAG) triad of metrics. These metrics are crucial for assessing the relevancy of the model's answers to user prompts.
 
 ## Overview
 RAG combines retrieval and language generation for accurate, relevant responses. The evaluation emphasizes three critical metrics:
@@ -30,13 +30,13 @@ These metrics ensure responses are not only factually accurate but also contextu
 
     st.markdown("## 📸 Dashboard Screenshots")
     image_paths = {
-        "./images/Trulens_Leaderboard.png": "TruLens Leaderboard for ESG Multimodal GPT",
+        "./images/Trulens_Leaderboard.png": "TruLens Leaderboard for Research Writer GPT",
         "./images/TruLens_Evaluations_01.png": "TruLens Evaluation Records",
         "./images/Evaluation_Feedback_Functions.png": "Evaluation Feedback Functions",
         "./images/TruLens_Evaluations_02.png": "TruLens Evaluation Relevancy Scores",
         "./images/TruLens_Evaluations_03.png": "Sample Record Details (1)",
         "./images/TruLens_Evaluations_04.png": "Sample Record Details (2)",
-        "./images/TruLens_Evaluations_06.png" : "Evaluation Results of RAG Triad of Metrics"
+        "./images/TruLens_Evaluations_05.png" : "Evaluation Results of RAG Triad of Metrics"
     }
 
     for image_path, image_title in image_paths.items():
@@ -47,25 +47,23 @@ These metrics ensure responses are not only factually accurate but also contextu
     st.markdown("""
     ## 📝 Key Findings and Insights
 
-   Based on the RAG evaluation of the Gemini LLM, several key findings have emerged:
+   Based on the RAG evaluation of GPT-4, several key findings have emerged:
 
-    - **High Relevance in Document Retrieval**: The Gemini LLM showed a strong ability to retrieve documents highly relevant to the user prompts, indicating robust understanding of query context.
+    - **High Relevance in Document Retrieval**: GPT-4 LLM showed a strong ability to retrieve documents highly relevant to the user prompts, indicating robust understanding of query context.
     - **Varied Performance in Answer Generation**: While the LLM was often accurate in generating answers, some responses lacked specificity or depth, suggesting room for improvement in leveraging retrieved information.
     - **Contextual Coherence**: The overall coherence of responses was good, but there were occasional instances where the integration of retrieved information could be more seamless.
     - **Speed and Efficiency**: The response time was generally efficient, though optimization could further enhance the user experience.
 
-    These insights point to a robust foundation in the Gemini LLM's retrieval capabilities, with some areas identified for enhancing answer generation and contextual integration.
+    These insights point to a robust foundation in GPT-4 LLM's retrieval capabilities, with some areas identified for enhancing answer generation and contextual integration.
 
 
     ## 🔚 Conclusions and Next Steps
 
-      The evaluation of the Gemini LLM using RAG metrics has provided valuable insights into its current capabilities and areas for improvement:
+      The evaluation of the GPT-4 LLM using RAG metrics has provided valuable insights into its current capabilities and areas for improvement:
 
     - **Future Enhancements**: Focusing on improving the depth and specificity of generated answers will be a key area of development.
     - **Advanced Contextual Integration**: Enhancing the model's ability to more seamlessly integrate retrieved information into coherent responses.
     - **Continued Monitoring and Evaluation**: Regular evaluations using updated RAG metrics and user feedback will help in continuously improving the model.
-
-    Overall, the Gemini LLM presents a promising foundation with clear pathways for future enhancements to better meet user needs and expectations.
 
     """)
 

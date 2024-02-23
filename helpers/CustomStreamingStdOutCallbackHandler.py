@@ -58,6 +58,5 @@ class CustomStreamingStdOutCallbackHandler(FinalStreamingStdOutCallbackHandler):
 			if token != self.stop_token:
 				for character in token:
 					yield (character, timestamp)
-					time.sleep(0.2)  # Remove this line. It's just for illustration purposes
 			else:
 				break

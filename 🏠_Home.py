@@ -1,23 +1,13 @@
 import streamlit as st
+from utils.OAuthClientLib import *
+from utils.auth_functions import *
 
 def main():
-    st.set_page_config(page_title="Research Assistant GPT", layout="wide", page_icon="🏠")
-
-    # Stylish Header
-    st.title("🎓 Research Assistant GPT 🤖")
-
-    # Description Section
-    st.header("Welcome to the Future of Academic Research!")
-    st.markdown("""
-        Explore the world of academia with ease 🎓! Our AI-powered research assistant 🤖 is here to 
-        help you discover and recommend scholarly papers 📚, provide insightful summaries 📄, and 
-        guide you through a sea of literature with style and efficiency 🌟.
-        
-        Whether you're a seasoned researcher or a curious learner, our tool is designed to empower 
+   
+    st.markdown(""" Whether you're a seasoned researcher or a curious learner, our tool is designed to empower 
         your academic journey and unlock new horizons of knowledge. Dive into our vast collection of 
-        resources and let the AI do the heavy lifting for you. Here's what you can expect:
-    """)
-
+        resources and let the AI do the heavy lifting for you. Here's what you can expect:""")
+    
     st.image(image='./images/research-assistant-gpt-01.png', width=600)
 
     # Key Features Section
@@ -44,4 +34,51 @@ def main():
     st.markdown("Research Assistant GPT © 2024. All Rights Reserved.")
 
 if __name__ == "__main__":
-    main()
+    st.set_page_config(page_title="Research Assistant GPT", layout="wide", page_icon="🏠")
+
+    # Stylish Header
+    st.title("🎓 Research Assistant GPT 🤖")
+
+    # Description Section
+    st.subheader("Welcome to the Future of Academic Research!")
+    st.caption("""
+        Explore the world of academia with ease 🎓! Our AI-powered research assistant 🤖 is here to 
+        help you discover and recommend scholarly papers 📚, provide insightful summaries 📄, and 
+        guide you through a sea of literature with style and efficiency 🌟.
+    """)
+
+    st.divider()
+
+    if "authentication_status" not in st.session_state or st.session_state["authentication_status"] is None:
+        google_login_col, login_text_col, github_login_col = st.columns([4,1,4])
+        with google_login_col:
+            login_google_oauth()
+
+        with github_login_col:
+            login_github_oauth()
+
+    # Initialize session state for authentication
+    if "authentication_status" not in st.session_state:
+        st.session_state["authentication_status"] = None
+
+    # Sidebar content
+    if st.session_state.get("authentication_status"):
+        st.sidebar.subheader(f"""Welcome, {st.session_state.get('name', st.session_state["email"])}""")
+        if st.sidebar.button("Logout"):
+            logout()  
+            st.rerun()
+
+    # Main page content
+    if st.session_state["authentication_status"]:
+        main() 
+    else:
+        # Authentication (Login/SignUp) options
+        menu = ["Login", "SignUp"]
+        choice = st.selectbox("**You can also select to Login or SignUp from the below drop down list**", menu)
+        if choice == "Login":
+            st.markdown(f"**If you don't have an account, please select the sign-up option from the dropdown list to register with your email address.**")
+            login()
+        elif choice == "SignUp":
+            if register_user():
+                st.success("Your account has been registered successfully! You can use your email and password to access the app.", icon="✅")
+

@@ -1,13 +1,15 @@
 import re
-from langchain.tools import BaseTool
-from clarifai.client.model import Model
-from clarifai.client.input import Inputs
+import streamlit as st
+from langchain_community.tools import BaseTool
+from openai import OpenAI
+import base64
+import requests
 
-class ClarifaiImageAnalyzerFromURL(BaseTool):
+class ImageAnalyzerFromURL(BaseTool):
     name = "Image Captioning and Description"
-    description = """A tool to analyze, describe and generate insights about the images or videos. 
-    Use this tool when the user prompt includes a request to describe or analyse an image or video. 
-    The image or video URL should be provided in the user prompt, otherwise do not use this tool.
+    description = """A tool to analyze, describe and generate insights about the images. 
+    Use this tool when the user prompt includes a request to describe or analyse an image. 
+    The image URL should be provided in the user prompt, otherwise do not use this tool.
     Make sure to pass the whole user prompt in the 'action_input' parameter."""
 
     def __init__(self):
@@ -26,31 +28,79 @@ class ClarifaiImageAnalyzerFromURL(BaseTool):
         if text_prompt is None or text_prompt == '':
             text_prompt = "Describe and analyze this image or video."
 
-        model = Model("https://clarifai.com/openai/chat-completion/models/openai-gpt-4-vision")
-        inference_params = {'temperature': 0.2, 'max_tokens': 4000}
-        clarifai_inputs = Inputs.get_multimodal_input(input_id="", image_url=image_url, raw_text=text_prompt)
-        model_prediction = model.predict(inputs=[clarifai_inputs], inference_params=inference_params)
-        return model_prediction.outputs[0].data.text.raw
+        client = OpenAI()
+
+        response = client.chat.completions.create(
+        model="gpt-4-vision-preview",
+        messages=[
+            {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": f"{text_prompt}"},
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"{image_url}",
+                    "detail": "high"
+                },
+                },
+            ],
+            }
+        ],
+        max_tokens=4000,
+        )
+
+        return response.choices[0].message.content
     
 
-class ClarifaiImageAnalyzerFromFile(BaseTool):
+class ImageAnalyzerFromFile(BaseTool):
     name = "Image Analyzer Tool"
-    description = """A tool to analyze, describe and generate insights about the images or videos. 
-    Use this tool when the user prompt includes a request to describe or analyse an image or video. 
-    The image or video URL should be provided in the user prompt, otherwise do not use this tool.
-    Make sure to pass the whole user prompt in the 'action_input' parameter."""
+    description = """A tool to analyze, describe and generate insights about the images. 
+    Use this tool when the user prompt includes a request to describe or analyse an image. 
+    Use this tool if the image is uploaded and provided as base64 string."""
 
     def __init__(self):
         super().__init__()
 
     def _run(self, **kwargs):
-        file_bytes = kwargs.get('file_bytes')
+        base64_image = kwargs.get('base64_image')
         prompt = kwargs.get('prompt')
-        # Prepare inference parameters
-        inference_params = {'temperature': 0.2, 'max_tokens': 4000}
 
-        # Perform model prediction
-        model = Model("https://clarifai.com/openai/chat-completion/models/openai-gpt-4-vision")
-        clarifai_inputs = Inputs.get_multimodal_input(input_id="", image_bytes=file_bytes, raw_text=prompt)
-        model_prediction = model.predict(inputs=[clarifai_inputs], inference_params=inference_params)
-        return model_prediction.outputs[0].data.text.raw
+        # OpenAI API Key
+        api_key = st.secrets["OPENAI_API_KEY"]
+
+
+        headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+        }
+
+        payload = {
+        "model": "gpt-4-vision-preview",
+        "messages": [
+            {
+            "role": "user",
+            "content": [
+                {
+                "type": "text",
+                "text": f"{prompt}"
+                },
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                }
+                }
+            ]
+            }
+        ],
+        "max_tokens": 4000
+        }
+
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        return response.json()['choices'][0]['message']['content']
+
+    # Function to encode the image
+    def encode_image(self, image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')

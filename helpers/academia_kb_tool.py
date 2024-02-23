@@ -1,5 +1,5 @@
-from langchain.tools import BaseTool
-from langchain.llms import Clarifai as Clarifaillm
+from langchain_community.tools import BaseTool
+from langchain_community.llms import Clarifai as Clarifaillm
 from langchain_community.vectorstores import Clarifai
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
